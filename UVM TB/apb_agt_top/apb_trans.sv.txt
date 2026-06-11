@@ -1,0 +1,28 @@
+class apb_trans extends uvm_sequence_item;
+	`uvm_object_utils(apb_trans)
+	
+	rand bit PRESET_n;
+	rand bit PWRITE_i;
+	bit PSEL_i,PENABLE_i;
+	rand bit [2:0]PADDR_i;
+	rand bit [7:0]PWDATA_i;
+	bit [7:0]PRDATA_o;
+	bit PSLVERR_o,PREADY_o;
+	
+	function new(string name="apb_trans");
+		super.new(name);
+	endfunction
+
+	function void do_print(uvm_printer printer);
+		super.do_print(printer);
+		printer.print_field("PRESET_n",this.PRESET_n,1,UVM_BIN);
+		printer.print_field("PWRITE_i",this.PWRITE_i,1,UVM_BIN);
+		printer.print_field("PSEL_i",this.PSEL_i,1,UVM_BIN);
+		printer.print_field("PENABLE_i",this.PENABLE_i,1,UVM_BIN);
+		printer.print_field("PADDR_i",this.PADDR_i,3,UVM_BIN);
+		printer.print_field("PWDATA_i",this.PWDATA_i,8,UVM_BIN);
+		printer.print_field("PRDATA_o",this.PRDATA_o,8,UVM_BIN);
+		printer.print_field("PSLVERR_o",this.PSLVERR_o,1,UVM_BIN);
+		printer.print_field("PREADY_o",this.PREADY_o,1,UVM_BIN);
+	endfunction
+endclass

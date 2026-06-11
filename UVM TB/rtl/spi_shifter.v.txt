@@ -1,0 +1,275 @@
+module spi_shifter(PCLK,PRESET_n, ss_i, send_data_i, lsbfe_i, cpha_i, cpol_i, miso_receive_sclk_i, miso_receive_sclk0_i, mosi_send_sclk_i, mosi_send_sclk0_i, miso_i, receive_data_i, data_mosi_i, mosi_o, data_miso_o);
+
+	input PCLK,PRESET_n, ss_i, send_data_i, lsbfe_i, cpha_i, cpol_i, miso_receive_sclk_i, miso_receive_sclk0_i, mosi_send_sclk_i, mosi_send_sclk0_i, miso_i, receive_data_i;
+	
+	input [7:0] data_mosi_i;
+
+	output reg mosi_o;
+	output reg [7:0] data_miso_o;
+
+	reg [7:0]shift_register; //Holds the outgoing 8-bit data to shift on MOSI
+	reg [7:0]temp_reg; //Collects incoming 8-bit data from MISO
+	reg [2:0] count, count1; //3-Bit counters for MOSI shifting (LSB-first/MSB-first)
+	reg [2:0]count2, count3; //3-Bit counters for MISO shifting (LSB-first/MSB-first)
+
+	//assign temp_reg = data_mosi_i;
+
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			shift_register<=8'b0;
+		else if(send_data_i)
+			shift_register<=data_mosi_i;
+		else 
+			shift_register<=shift_register;
+	end
+
+
+	always@(*)
+	begin
+		if(receive_data_i)
+			data_miso_o=temp_reg;
+		else
+			data_miso_o=8'h00;
+	end
+	
+	//Transmit data Bit-by-bit (MOSI)
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+		begin
+			mosi_o<=1'b0;
+			count<=3'b000;
+			count1<=3'b111;
+		end
+		else if(!ss_i)
+		begin
+			if( (!cpol_i && cpha_i) || (cpol_i && !cpha_i) ) //either of them are high
+			begin
+				if(lsbfe_i)
+				begin
+					if(count<=3'd7)
+					begin
+						if(mosi_send_sclk0_i)
+						begin
+							mosi_o<=shift_register[count];
+							count<=count+3'b1;
+						end
+						/*else
+						begin
+							//mosi_o<=mosi_o;
+							count<=count;
+						end*/
+					end
+
+					else //else for count
+					begin
+						//mosi_o<=mosi_o;
+						count<=3'd0;
+					end
+				end
+				else  //lsbfe as 0
+				begin
+					if(count1>=3'd0)
+					begin
+						if(mosi_send_sclk0_i)
+						begin
+							mosi_o<=shift_register[count1];
+							count1<=count1-3'b1;
+						end
+
+						/*else
+						begin
+							mosi_o<=mosi_o;
+							count1<=count1;
+						end*/
+					end
+					else
+					begin
+						//mosi_o<=mosi_o;
+						count1<=3'd7;
+					end
+				end
+			end
+
+			else  //both of them are high
+			begin
+				if(lsbfe_i)
+                                begin
+                                        if(count<=3'd7)
+                                        begin
+                                                if(mosi_send_sclk_i)
+                                                begin
+                                                        mosi_o<=shift_register[count];
+                                                        count<=count+3'b1;
+                                                end
+                                                /*else
+                                                begin
+                                                        mosi_o<=mosi_o;
+                                                        count<=count;
+                                                end*/
+                                        end
+
+                                        else //else for count
+                                        begin
+                                                //mosi_o<=mosi_o;
+                                                count<=3'd0;
+                                        end
+                                end
+                                else  //lsbfe as 0
+                                begin
+                                        if(count1>=3'd0)
+                                        begin
+                                                if(mosi_send_sclk_i)
+                                                begin
+                                                        mosi_o<=shift_register[count1];
+                                                        count1<=count1-3'b1;
+                                                end
+
+                                                /*else
+                                                begin
+                                                        mosi_o<=mosi_o;
+                                                        count1<=count1;
+                                                end*/
+                                        end
+                                        else
+                                        begin
+                                                //mosi_o<=mosi_o;
+                                                count1<=3'd7;
+                                        end
+                                end
+
+
+			end
+
+		end
+		/*else
+		begin
+			mosi_o<=mosi_o;
+                        count<=count;
+                        count1<=count1;
+
+		end*/
+
+	end
+	
+	//Receive Data Bit-by-Bit (MISO)
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+		begin
+			temp_reg<=1'b0;
+			count2<=3'b000;
+			count3<=3'b111;
+		end
+		else if(!ss_i)
+		begin
+			if( (!cpol_i && cpha_i) || (cpol_i && !cpha_i) ) //either of them are high
+			begin
+				if(lsbfe_i)
+				begin
+					if(count2<=3'd7)
+					begin
+						if(miso_receive_sclk0_i)
+						begin
+							temp_reg[count2]<=miso_i;
+							count2<=count2+1'b1;
+
+                        end
+						else
+						begin
+							temp_reg<=temp_reg;
+						end
+					end
+
+					else //else for count
+					begin
+						//mosi_o<=mosi_o;
+						count2<=8'd0;
+					end
+				end
+				else  //lsbfe as 0
+				begin
+					if(count3>=3'd0)
+					begin
+						if(miso_receive_sclk0_i)
+						begin
+							temp_reg[count3]<=miso_i;
+							count3<=count3-1'b1;
+						end
+
+						else
+						begin
+							temp_reg<=temp_reg;
+						end
+					end
+					else
+					begin
+						count3<=8'd7;
+					end
+				end
+			end
+
+			else  //both of them are high
+			begin
+				if(lsbfe_i)
+                                begin
+                                        if(count2<=3'd7)
+                                        begin
+                                                if(miso_receive_sclk_i)
+                                                begin
+                                                        temp_reg[count2]<=miso_i;
+                                                        count2<=count2+3'b1;
+                                                end
+                                                else
+                                                begin
+                                                    temp_reg<=temp_reg;    
+                                                end
+                                        end
+
+                                        else //else for count
+                                        begin
+                                                count2<=8'd0;
+                                        end
+                                end
+                                else  //lsbfe as 0
+                                begin
+                                        if(count3>=3'd0)
+                                        begin
+                                                if(miso_receive_sclk_i)
+                                                begin
+                                                        temp_reg[count3]<=miso_i;
+                                                        count3<=count3-3'b1;
+                                                end
+
+                                                else
+                                                begin
+                                                        temp_reg<=temp_reg;
+                                                end
+                                        end
+                                        else
+                                        begin
+                                               count3<=8'd7;
+                                        end
+                                end
+
+
+			end
+
+		end
+		/*else
+		begin
+			mosi_o<=mosi_o;
+                        count2<=count2;
+                        count3<=count3;
+
+		end*/
+
+	end
+
+
+
+	
+
+endmodule
+

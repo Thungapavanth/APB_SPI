@@ -1,0 +1,38 @@
+interface apb_if(input bit clock);
+	bit PCLK;
+	logic PRESET_n;
+	logic PSEL_i,PENABLE_i,PREADY_o,PWRITE_i,PSLVERR_o;
+	logic[2:0]PADDR_i;
+	logic [7:0]PWDATA_i,PRDATA_o;
+
+	assign PCLK=clock;
+
+	clocking apb_drv_cb@(posedge clock);
+		default input #1 output #1;
+		output PRESET_n;
+		output PSEL_i;
+		output PENABLE_i;
+		output PWRITE_i;
+		output PADDR_i;
+		output PWDATA_i;
+		input PREADY_o;
+		input PRDATA_o;
+		input PSLVERR_o;
+	endclocking:apb_drv_cb
+
+	clocking apb_mon_cb@(posedge clock);
+		default input #1 output #1;
+		input PRESET_n;
+		input PSEL_i;
+		input PENABLE_i;
+		input PWRITE_i;
+		input PADDR_i;
+		input PWDATA_i;
+		input PREADY_o;
+		input PRDATA_o;
+		input PSLVERR_o;
+	endclocking:apb_mon_cb
+
+	modport APB_DRV_MP(clocking apb_drv_cb);
+	modport APB_MON_MP(clocking apb_mon_cb);
+endinterface

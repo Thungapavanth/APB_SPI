@@ -1,0 +1,191 @@
+module spi_baud_generator(PCLK, PRESET_n,spi_mode_i, spiswai_i, spr_i, sppr_i, cpol_i, cpha_i, ss_i, SCLK_o, miso_receive_sclk_o, miso_receive_sclk0_o, mosi_send_sclk_o, mosi_send_sclk0_o, BaudRateDivisor_o);
+
+	input PCLK, PRESET_n;
+	input [1:0] spi_mode_i;
+	input spiswai_i;
+	input [2:0] spr_i, sppr_i;
+	input cpol_i, cpha_i;
+	input ss_i;
+
+	parameter mode_run = 2'b00, 
+		mode_wait =2'b01, 
+		mode_stop=2'b10;
+
+	output reg SCLK_o;
+	output reg miso_receive_sclk_o;
+	output reg miso_receive_sclk0_o;
+	output reg mosi_send_sclk_o;
+	output reg mosi_send_sclk0_o;
+
+
+	reg pre_sclk_s;
+	reg [11:0]count_s;
+
+	output reg [11:0]BaudRateDivisor_o;
+
+
+	//Compute Baud Rate Divisor
+	always@(*)
+	begin
+		BaudRateDivisor_o= (sppr_i+1'b1) * (2 ** (spr_i+1'b1));
+	end
+
+	//Generate Initial SCLK Polarity
+	always@(*)
+	begin
+		pre_sclk_s = (cpol_i) ? 1'b1 : 1'b0;
+	end
+	
+	
+
+	//Generate SPI clock
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+
+		if(!PRESET_n)
+		begin
+			count_s<=12'b0;
+			SCLK_o<=pre_sclk_s;
+		end
+		
+		else if((!ss_i) && (!spiswai_i) && ((spi_mode_i==mode_run) || (spi_mode_i==mode_wait)) )
+			begin
+					if(count_s ==  (((BaudRateDivisor_o)/2)-1'b1)   )
+					begin
+						SCLK_o<=~SCLK_o;
+						count_s<=12'b0;
+					end
+					else
+					begin
+						count_s<=count_s+12'b1;
+					end
+			end
+			
+			
+		else
+		begin
+				SCLK_o<=pre_sclk_s;
+				count_s<=12'b0;				
+		end
+		
+		/*else
+		begin
+			if((!ss_i) && (!spiswai_i) && ((spi_mode_i==mode_run) || (spi_mode_i==mode_wait)) )
+			begin
+				SCLK_o<=~SCLK_o;
+				count_s<=12'b0;
+			end
+			else
+			begin
+				count_s<=count_s+12'b1;
+			end	
+		
+		end*/
+		
+	end
+
+
+	//Generate MISO Sample Flags
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		
+		if(!PRESET_n)
+		begin
+			miso_receive_sclk_o<=1'b0;
+			miso_receive_sclk0_o<=1'b0;
+		end
+
+		else if( ( (!(cpha_i)) && cpol_i) || (cpha_i && (!(cpol_i))) && (!ss_i))
+		begin
+			if(SCLK_o)
+			begin
+				if(count_s ==  (((BaudRateDivisor_o)/2)-1'b1)  )
+					miso_receive_sclk0_o<=1'b1;
+				else
+					miso_receive_sclk0_o<=1'b0;
+			end
+			else
+			begin
+				miso_receive_sclk_o<=1'b0;
+        	   miso_receive_sclk0_o<=1'b0;
+			end
+		end	
+
+		else if( (((!cpha_i)&&(!cpol_i)) || (cpha_i && cpol_i))&& (!ss_i))
+		begin
+			if(!SCLK_o)
+			begin		
+				if(count_s ==  (((BaudRateDivisor_o)/2)-1'b1)  )
+					miso_receive_sclk_o<=1'b1;
+				else
+					miso_receive_sclk_o<=1'b0;
+			end	
+
+			else
+                        begin
+                                miso_receive_sclk_o<=1'b0;
+                                miso_receive_sclk0_o<=1'b0;
+                        end 
+		end	
+
+		else
+		begin
+			miso_receive_sclk_o<=1'b0;
+			miso_receive_sclk0_o<=1'b0;
+		end
+
+	end
+
+
+	//Generate MOSI Sample flags
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+                begin
+                        mosi_send_sclk_o<=1'b0;
+                        mosi_send_sclk0_o<=1'b0;
+                end
+
+                else if(  ((!cpha_i && cpol_i) || (cpha_i && !cpol_i)) && (~ss_i) )
+                begin
+                        if(SCLK_o)
+                        begin
+                                if(count_s ==  (((BaudRateDivisor_o)/2)-2'b10)  )
+                                       	mosi_send_sclk0_o<=1'b1;
+                                else
+                                        mosi_send_sclk0_o<=1'b0;
+                        end
+                        else
+                        begin
+                                mosi_send_sclk_o<=1'b0;
+                                mosi_send_sclk0_o<=1'b0;
+                        end
+                end
+
+					 else if( ( (!cpha_i && !cpol_i) || (cpha_i && cpol_i)) && (~ss_i) )
+                begin
+                        if(!SCLK_o)
+                        begin
+                                if(count_s ==  (((BaudRateDivisor_o)/2)-2'b10)  )
+                                        mosi_send_sclk_o<=1'b1;
+                                else
+                                        mosi_send_sclk_o<=1'b0;
+                        end
+
+                        else
+                        begin
+                                mosi_send_sclk_o<=1'b0;
+                                mosi_send_sclk0_o<=1'b0;
+                        end
+                end
+
+                else
+                begin
+                        mosi_send_sclk_o<=1'b0;
+                        mosi_send_sclk0_o<=1'b0;
+                end
+
+	end
+
+endmodule
+

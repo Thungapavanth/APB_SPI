@@ -1,0 +1,22 @@
+interface spi_if(input bit clock);
+	logic SCLK_o,miso_i,mosi_o,ss_o;
+	
+	clocking spi_drv_cb@(posedge clock);
+		default input #1 output #1;
+		output miso_i;
+		input mosi_o;
+		input ss_o;
+		input SCLK_o;
+	endclocking:spi_drv_cb
+
+	clocking spi_mon_cb@(posedge clock);
+		default input #1 output #1;
+		input miso_i;
+		input mosi_o;
+		input ss_o;
+		input SCLK_o;
+	endclocking:spi_mon_cb
+	
+	modport SPI_DRV_MP(clocking spi_drv_cb);
+	modport SPI_MON_MP(clocking spi_mon_cb);
+endinterface

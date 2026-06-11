@@ -1,0 +1,10 @@
+class spi_agt_config extends uvm_object;
+	`uvm_object_utils(spi_agt_config)
+
+	uvm_active_passive_enum is_active;
+	virtual spi_if spi_if;
+
+	function new(string name="spi_agt_config");
+		super.new(name);
+	endfunction
+endclass

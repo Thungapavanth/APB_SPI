@@ -1,0 +1,24 @@
+class spi_seqs extends uvm_sequence#(spi_trans);
+	`uvm_object_utils(spi_seqs)
+
+	function new(string name="spi_seqs");
+		super.new(name);
+	endfunction
+endclass
+
+class spi_miso_seqs extends spi_seqs;
+	`uvm_object_utils(spi_miso_seqs)
+	function new(string name="spi_miso_seqs");
+		super.new(name);
+	endfunction
+
+	task body();
+		repeat(1)
+		begin
+			req=spi_trans::type_id::create("req");
+			start_item(req);
+			assert(req.randomize());
+			finish_item(req);
+		end
+	endtask
+endclass

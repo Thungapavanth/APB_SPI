@@ -1,0 +1,362 @@
+
+`define SPI_APB_DATA_WIDTH 8;
+`define SPI_REG_WIDTH 8;
+`define SPI_APB_ADDR_WIDTH 3;
+
+
+module spi_slave_interface(PCLK, PRESET_n, PWRITE_i, PSEL_i, PENABLE_i, PADDR_i, PWDATA_i, ss_i, miso_data_i,receive_data_i, tip_i, PRDATA_o, mstr_o, cpol_o, cpha_o, lsbfe_o, spiswai_o,sppr_o, spr_o,spi_interrupt_request_o, PREADY_o, PSLVERR_o, send_data_o, mosi_data_o, spi_mode_o);
+
+	input PCLK, PRESET_n, PWRITE_i, PSEL_i, PENABLE_i;
+	input [2:0] PADDR_i;
+	input [7:0] PWDATA_i;
+	input ss_i;
+	input [7:0] miso_data_i;
+	input receive_data_i, tip_i;
+
+	output reg [7:0] PRDATA_o;
+	output mstr_o, cpol_o, cpha_o, lsbfe_o, spiswai_o;
+	output [2:0] sppr_o, spr_o;
+
+	output reg  send_data_o;
+	output reg [7:0]mosi_data_o;
+	output reg [1:0] spi_mode_o;
+	output spi_interrupt_request_o, PREADY_o, PSLVERR_o;
+
+	
+	//state for APB FSM are IDLE, SETUP, ENABLE
+	reg [1:0]state, next_state;
+
+	//states for SPI mode FSM are spi_run, spi_wait, spi_stop
+	reg [1:0] next_mode;
+
+	//Default registers of SPI Controller
+	reg [7:0] SPI_CR_1, SPI_CR_2, SPI_BR, SPI_SR, SPI_DR;
+
+	//Flags for interrupts and status
+ 	wire spif, sptef, modf,modfen,spe;
+
+	//Write and read enable signals
+	wire wr_enb, rd_enb;
+
+	/*APB state FSM*/
+	parameter IDLE=2'b00, SETUP=2'b01, ENABLE =2'b10;
+	
+	parameter BR_mask  = 8'b01110111;
+	parameter CR2_mask  = 8'b00011011;
+
+	// Present sequential block for APB State FSM
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			state<=IDLE;
+		else
+			state<=next_state;
+	end
+
+	//Next state combinational block for APB State FSM
+	always@(state, PSEL_i, PENABLE_i)
+	begin
+	
+		case(state)
+			IDLE: begin
+				if(PSEL_i && (!PENABLE_i))
+					next_state=SETUP;
+				else
+					next_state=IDLE;
+			end
+
+			SETUP:	begin
+				if(PSEL_i && (!PENABLE_i))
+					next_state=SETUP;
+				else if(PSEL_i && PENABLE_i)
+					next_state=ENABLE;
+				else
+					next_state=IDLE;
+			end
+
+			ENABLE:	begin
+				if(PSEL_i)
+					next_state=SETUP;
+				else
+					next_state=IDLE;
+			end
+
+			default: next_state=IDLE;
+		endcase
+
+	end
+
+	//Output Assign Logic for APB state FSM
+	assign PREADY_o = (state==ENABLE) ? 1'b1 : 1'b0;
+	//assign PSLVERR_o = (state==ENABLE && (ss_i)) ? (tip_i) : 1'b0;
+	assign PSLVERR_o = (state==ENABLE) ? (~tip_i) : 1'b0;
+	assign wr_enb = ((state==ENABLE) && (PWRITE_i)) ? 1'b1 : 1'b0;
+	assign rd_enb = ((state==ENABLE) && (!PWRITE_i)) ? 1'b1 : 1'b0;
+
+
+	/* SPI Mode FSM */
+	parameter spi_run=2'b00, spi_wait=2'b01, spi_stop=2'b10;
+
+	//present sequential block for SPI mode FSM
+	always@(posedge PCLK or negedge PRESET_n)
+        begin
+                if(!PRESET_n)
+                        spi_mode_o<=spi_run;
+                else
+                        spi_mode_o<=next_mode;
+        end
+
+	//Next state combination block fo SPI Mode FSM
+	always@(spi_mode_o, spe, spiswai_o)
+	begin
+		case(spi_mode_o)
+			spi_run:begin
+				if(!spe)	next_mode=spi_wait;
+				else		next_mode=spi_run;
+			end
+
+			spi_wait:begin
+				if(spiswai_o)	next_mode=spi_stop;
+				else if (!spe)	next_mode=spi_wait;
+				else		next_mode=spi_run;				
+			end
+
+			spi_stop:begin
+				if(!spiswai_o)	next_mode=spi_wait;
+				else if(spe)	next_mode=spi_run;
+				else		next_mode=spi_stop;	
+			end
+
+			default: next_mode=spi_run;
+
+		endcase
+
+	end
+
+
+	//register PWDATA_i to SPI_CR_1 register
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			SPI_CR_1 <=8'h04;	
+		else
+		begin
+				if( wr_enb && (PADDR_i == 3'b000) )
+					SPI_CR_1 <=PWDATA_i;
+				else
+					SPI_CR_1 <=SPI_CR_1;
+
+		end		
+	end
+	
+	assign mstr_o = SPI_CR_1[4];
+	assign cpol_o = SPI_CR_1[3];
+	assign cpha_o = SPI_CR_1[2];
+	assign lsbfe_o = SPI_CR_1[0];
+
+	wire spie, sptie, ssoe;
+	assign spie = SPI_CR_1[7];
+	assign spe = SPI_CR_1[6];
+	assign sptie = SPI_CR_1[5];
+	assign ssoe= SPI_CR_1[1];
+
+
+	//register PWDATA_i to SPI_CR_2 register
+//	reg [7:0] CR2_mask;
+	//reg [7:0] BR_mask;
+	
+	/*always@(*)
+	begin
+		BR_mask  = 8'b01110111;
+		CR2_mask  = 8'b00011011;
+	end*/
+
+
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			SPI_CR_2 <=8'h00;
+		else
+		begin
+				if( wr_enb && (PADDR_i == 3'b001) )
+					SPI_CR_2 <=PWDATA_i & CR2_mask;
+				else
+					SPI_CR_2 <=SPI_CR_2;
+		end
+	end
+	
+	/*
+	else if((PADDR_i == 3'b001) && wr_enb)
+         SPI_CR_2 <=PWDATA_i & CR2_mask;
+   else
+          SPI_CR_2<=SPI_CR_2;*/
+
+	assign spiswai_o = SPI_CR_2[1];
+
+	//reg bidire, spce;
+	assign modfen = SPI_CR_2[4];
+
+	/*always@(*)
+	begin
+		bidire = SPI_CR_2[3];
+		spce = SPI_CR_2 [0];
+	end*/
+
+
+	//register PWDATA_i to SPI_BR register
+       
+	always@(posedge PCLK or negedge PRESET_n)
+   begin
+		if(!PRESET_n)
+			SPI_BR <=8'h00;
+		else
+		begin
+				if( wr_enb && (PADDR_i == 3'b010) )
+					SPI_BR <=PWDATA_i & BR_mask;
+				else
+					SPI_BR <=SPI_BR;
+		end
+	end
+		  
+		  /*
+		  else if((PADDR_i == 3'b010) && wr_enb)
+             SPI_BR <=PWDATA_i & BR_mask;
+        else
+             SPI_BR<=SPI_BR;
+		  */
+
+	assign sppr_o=SPI_BR[6:4];
+	assign spr_o=SPI_BR[2:0];
+
+	//register PWDATA to Data register SPI_DR
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			SPI_DR<=8'b00;
+		
+		else if(wr_enb)
+		begin
+			if(PADDR_i==3'b101)
+				SPI_DR<=PWDATA_i;
+			else
+				SPI_DR<=SPI_DR;
+		end
+		
+		else 
+		begin
+			if( (SPI_DR==PWDATA_i) & (SPI_DR !=miso_data_i) & ((spi_mode_o == spi_run)||(spi_mode_o==spi_wait))  )
+				SPI_DR<=8'b0;
+			else
+			begin
+				if( ((spi_mode_o == spi_run)||(spi_mode_o==spi_wait)) & (receive_data_i)) 
+					SPI_DR<=miso_data_i;
+				else
+					SPI_DR<=SPI_DR;
+			end
+
+		end
+
+	end
+
+	//send data
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n) 
+			send_data_o<=1'b0;
+		else 
+		begin
+				if(wr_enb)
+					send_data_o<=1'b0;
+				else
+					begin
+						if( (SPI_DR==PWDATA_i) &&(SPI_DR!=miso_data_i) &&((spi_mode_o==spi_run) || (spi_mode_o == spi_wait))  )
+							send_data_o<=1'b1;
+						else
+							send_data_o<=1'b0;
+					end
+		end
+		
+	end
+
+	//Implement APB Read Data Path
+	//To read data from spi_core to APB Master
+	
+	always@(*)
+	begin
+		if(!rd_enb)
+			PRDATA_o=8'b0;
+		else
+		begin
+			case(PADDR_i)
+				3'b000: PRDATA_o=SPI_CR_1;
+				3'b001: PRDATA_o=SPI_CR_2;
+				3'b010: PRDATA_o=SPI_BR;
+				3'b011: PRDATA_o=SPI_SR;
+				3'b101: PRDATA_o=SPI_DR;
+				default: PRDATA_o = 8'b0;
+			endcase
+		end
+	end
+
+	
+	assign modf=( (!ss_i) && (mstr_o) && (modfen) && (!ssoe))?1'b1:1'b0;
+
+	/*
+	always@(*)
+	begin
+		if(!spie && !sptie)	
+		begin
+			spi_interrupt_request_o=1'b0;
+			bidire=1'b0;
+			spce=1'b0;
+		end
+
+		else
+		begin
+			if(spie && !sptie)
+				spi_interrupt_request_o=spif||modf;
+			else
+			begin
+				if(!spie && sptie)
+					spi_interrupt_request_o=sptef;
+				elsei
+					spi_interrupt_request_o=sptef||modf||spif;
+			end
+		end
+	end
+	*/
+   assign spi_interrupt_request_o = (spie) ? ((sptie)? (sptef||modf||spif) : (spif||modf) ) : ((sptie)?sptef:1'b0 );
+
+	assign spif = (SPI_DR!=8'b00000000) ? 1'b1 : 1'b0;
+   assign sptef = (SPI_DR==8'b00000000) ? 1'b1 : 1'b0;
+
+       //assign respective values to SPI_SR
+   always@(*)
+	begin
+		if(!PRESET_n)
+			SPI_SR={spif,1'b0,sptef,modf,4'b0};
+		else
+			SPI_SR=8'b00100000;
+	end
+
+	//mosi_data
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			mosi_data_o<=8'b0;
+		else
+		begin
+			if( (SPI_DR == PWDATA_i) && (SPI_DR!=miso_data_i)  && ((spi_mode_o ==spi_run) || (spi_mode_o==spi_wait) ) )
+				mosi_data_o<=SPI_DR;
+			else
+				mosi_data_o<=mosi_data_o;
+
+		end
+
+	end
+	
+	
+
+
+endmodule
+

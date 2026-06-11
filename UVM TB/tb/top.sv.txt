@@ -1,0 +1,34 @@
+module top();
+	import uvm_pkg::*;
+	import apb_spi_pkg::*;
+	`include "uvm_macros.svh"
+
+	bit clk;
+	always #5 clk=~clk;
+
+	apb_if APB_IF(clk);
+	spi_if SPI_IF(clk);
+	
+	spi_top_module DUT(.PCLK(APB_IF.PCLK),
+				.PRESET_n(APB_IF.PRESET_n),
+				.PADDR_i(APB_IF.PADDR_i),
+				.PWRITE_i(APB_IF.PWRITE_i),
+				.PSEL_i(APB_IF.PSEL_i),
+				.PENABLE_i(APB_IF.PENABLE_i),
+				.PWDATA_i(APB_IF.PWDATA_i),
+				.miso_i(SPI_IF.miso_i),
+				.PRDATA_o(APB_IF.PRDATA_o),
+				.PREADY_o(APB_IF.PREADY_o),
+				.PSLVERR_o(APB_IF.PSLVERR_o),
+				.SCLK_o(SPI_IF.SCLK_o),
+				.mosi_o(SPI_IF.mosi_o),
+				.ss_o(SPI_IF.ss_o),
+				.spi_interrupt_request_o(spi_interrupt_request_o));
+
+	initial
+	begin
+		uvm_config_db#(virtual apb_if)::set(null,"*","apb_if",APB_IF);
+		uvm_config_db#(virtual spi_if)::set(null,"*","spi_if",SPI_IF);
+		run_test("test");
+	end
+endmodule

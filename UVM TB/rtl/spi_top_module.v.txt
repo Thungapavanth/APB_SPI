@@ -1,0 +1,38 @@
+/*
+`include "spi_baud_generator.v"
+`include "spi_slave_select.v"
+`include "spi_slave_interface.v"
+`include "spi_shifter.v"
+*/
+
+module spi_top_module(PCLK, PRESET_n, PADDR_i, PWRITE_i, PSEL_i, PENABLE_i, PWDATA_i, miso_i, ss_o, SCLK_o, spi_interrupt_request_o, mosi_o, PRDATA_o, PREADY_o, PSLVERR_o);
+
+	input PCLK, PRESET_n, PWRITE_i, PSEL_i, PENABLE_i, miso_i;
+	input [2:0] PADDR_i;
+	input [7:0] PWDATA_i;
+
+
+	output ss_o, SCLK_o, spi_interrupt_request_o, mosi_o, PREADY_o, PSLVERR_o;
+	output [7:0] PRDATA_o;
+
+	wire [1:0] spi_mode;
+	wire [2:0] spr, sppr;
+	wire [11:0] BaudRateDivisor_o;
+	wire [7:0] mosi_data, miso_data;
+
+	spi_slave_interface DUT1si(PCLK, PRESET_n, PWRITE_i, PSEL_i, PENABLE_i, PADDR_i, PWDATA_i, ss_o, miso_data, receive_data, tip, PRDATA_o, mstr, cpol, cpha, lsbfe, spiswai, sppr, spr, spi_interrupt_request_o, PREADY_o, PSLVERR_o, send_data, mosi_data, spi_mode);
+	//spi_slave_interface(PCLK, PRESET_n, PWRITE_i, PSEL_i, PENABLE_i, PADDR_i, PWDATA_i, ss_i, miso_data_i,receive_data_i, tip_i, PRDATA_o, mstr_o, cpol_o, cpha_o, lsbfe_o, spiswai_o,sppr_o, spr_o,spi_interrupt_request_o, PREADY_o, PSLVERR_o, send_data_o, mosi_data_o, spi_mode_o);
+	
+	spi_baud_generator DUT2bg(PCLK, PRESET_n, spi_mode, spiswai, spr, sppr, cpol, cpha, ss_o, SCLK_o,  miso_receive_sclk, miso_receive_sclk0, mosi_send_sclk, mosi_send_sclk0, BaudRateDivisor_o);
+	//spi_baud_generator(PCLK, PRESET_n,spi_mode_i, spiswai_i, spr_i, sppr_i, cpol_i, cpha_i, ss_i, SCLK_o, miso_receive_SCLK_o, miso_receive_sclk0_o, mosi_send_sclk_o, mosi_send_sclk0_o, BaudRateDivisor_o,count_s);
+
+	spi_shifter DUT3s(PCLK,PRESET_n, ss_o, send_data, lsbfe, cpha, cpol, miso_receive_sclk, miso_receive_sclk0, mosi_send_sclk, mosi_send_sclk0, miso_i, receive_data, mosi_data, mosi_o, miso_data);
+	
+	spi_slave_select DUT4ss(PCLK, PRESET_n, mstr, spiswai, spi_mode, send_data, BaudRateDivisor_o, receive_data, ss_o, tip);
+		
+	
+		
+endmodule
+
+
+

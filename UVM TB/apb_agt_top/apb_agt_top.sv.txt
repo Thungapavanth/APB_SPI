@@ -1,0 +1,30 @@
+class apb_agt_top extends uvm_env;
+	`uvm_component_utils(apb_agt_top)
+	
+	apb_agt agt[];
+	apb_agt_config apb_cfg[];
+	apb_spi_tb_config tb_cfg;
+
+        function new(string name="apb_agt_top",uvm_component parent);
+                super.new(name,parent);
+        endfunction
+
+	function void build_phase(uvm_phase phase);
+                super.build_phase(phase);
+
+                if(!uvm_config_db#(apb_spi_tb_config)::get(this,"","apb_spi_tb_config",tb_cfg))
+                        `uvm_fatal(get_type_name(),"getting tb_cfg failed!!")
+
+                if(tb_cfg.has_apb_agt)
+                begin
+                        agt=new[tb_cfg.no_of_apb_agt];
+                        foreach(agt[i])
+                        begin
+				uvm_config_db#(apb_agt_config)::set(this,$sformatf("agt[%0d]*",i),"apb_agt_config",tb_cfg.apb_cfg[i]);
+
+                                agt[i]=apb_agt::type_id::create($sformatf("agt[%0d]",i),this);
+                        end
+                end
+        endfunction
+	
+endclass

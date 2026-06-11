@@ -1,0 +1,15 @@
+class apb_spi_tb_config extends uvm_object;
+	`uvm_object_utils(apb_spi_tb_config)
+	
+	spi_agt_config spi_cfg[];
+	apb_agt_config apb_cfg[];
+
+	int no_of_spi_agt;
+	int no_of_apb_agt;
+	int has_apb_agt=1;
+        int has_spi_agt=1;
+
+	function new(string name="apb_spi_tb_config");
+		super.new(name);
+	endfunction
+endclass

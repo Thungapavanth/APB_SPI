@@ -1,0 +1,116 @@
+class apb_seqs extends uvm_sequence#(apb_trans);
+	`uvm_object_utils(apb_seqs)
+
+	function new(string name="apb_seqs");
+		super.new(name);
+	endfunction
+endclass
+
+//write sequence
+class apb_write_seqs extends apb_seqs;
+	`uvm_object_utils(apb_write_seqs)
+	function new(string name="apb_write_seqs");
+		super.new(name);
+	endfunction
+	
+	bit [7:0]ctrl;
+
+	task body();
+		if(!uvm_config_db#(bit[7:0])::get(null,get_full_name(),"bit",ctrl))
+	            `uvm_fatal(get_type_name(), "Not getting ctrl from test")
+		repeat(1)
+		begin
+			req=apb_trans::type_id::create("req");
+		
+			start_item(req);
+			assert(req.randomize() with{PRESET_n; PWRITE_i==1'b0; PADDR_i==3'b101;}); //Dummy read
+			finish_item(req);
+	
+			start_item(req);
+		        assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b1; PADDR_i==3'b000; PWDATA_i==ctrl;}); //CR1
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b1; PADDR_i==3'b001; PWDATA_i==8'b0001_1000;}); //CR2
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b1; PADDR_i==3'b010; PWDATA_i==8'b0001_0001;}); //BR
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b1; PADDR_i==3'b101;}); //DR
+			finish_item(req);
+		end
+	endtask
+endclass
+
+//read sequence
+class apb_read_seqs extends apb_seqs;
+	`uvm_object_utils(apb_read_seqs)
+	function new(string name="apb_read_seqs");
+		super.new(name);
+	endfunction
+
+	task body();
+		repeat(1)
+		begin
+			req=apb_trans::type_id::create("req");
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b0; PADDR_i==3'b000;}); //CR1
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b0; PADDR_i==3'b001;}); //CR2
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b0; PADDR_i==3'b010;}); //BR
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b0; PADDR_i==3'b011;}); //SR
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b1; PWRITE_i==1'b0; PADDR_i==3'b101;}); //DR
+			finish_item(req);
+	        end
+	endtask   
+endclass
+
+//reset sequence
+class apb_reset_seqs extends apb_seqs;
+	`uvm_object_utils(apb_reset_seqs)
+	function new(string name="apb_reset_seqs");
+		super.new(name);
+	endfunction
+
+	task body();
+		repeat(1)
+		begin
+			req=apb_trans::type_id::create("req");
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b0; PWRITE_i==1'b0; PADDR_i==3'b000;}); //CR1
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b0; PWRITE_i==1'b0; PADDR_i==3'b001;}); //CR2
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b0; PWRITE_i==1'b0; PADDR_i==3'b010;}); //BR
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b0; PWRITE_i==1'b0; PADDR_i==3'b011;}); //SR
+			finish_item(req);
+
+			start_item(req);
+			assert(req.randomize() with {PRESET_n==1'b0; PWRITE_i==1'b0; PADDR_i==3'b101;}); //DR
+			finish_item(req);
+	        end
+	endtask   
+endclass

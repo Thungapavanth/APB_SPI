@@ -1,0 +1,26 @@
+class apb_spi_tb extends uvm_env;
+	`uvm_component_utils(apb_spi_tb)
+	
+	spi_agt_top spi_agt;
+	apb_agt_top apb_agt;
+	apb_spi_tb_config tb_cfg;
+	apb_spi_sb sb;
+	
+	function new(string name="apb_spi_tb",uvm_component parent);
+		super.new(name,parent);
+	endfunction
+
+	function void build_phase(uvm_phase phase);
+		super.build_phase(phase);
+		if(!uvm_config_db #(apb_spi_tb_config)::get(this,"","apb_spi_tb_config",tb_cfg))
+			`uvm_fatal(get_type_name(),"getting tb_cfg is failed!!")
+		spi_agt=spi_agt_top::type_id::create("spi_agt",this);
+		apb_agt=apb_agt_top::type_id::create("apb_agt",this);
+		sb=apb_spi_sb::type_id::create("sb",this);
+	endfunction
+
+	function void connect_phase(uvm_phase phase);
+		apb_agt.agt[0].monh.ap.connect(sb.fifo_apb[0].analysis_export);
+		spi_agt.agt[0].monh.ap.connect(sb.fifo_spi[0].analysis_export);
+	endfunction
+endclass

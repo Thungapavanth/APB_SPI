@@ -1,0 +1,83 @@
+module spi_slave_select(PCLK, PRESET_n, mstr_i, spiswai_i, spi_mode_i, send_data_i, BaudRateDivisor_i, receive_data_o, ss_o, tip_o);
+					
+	
+	input PCLK, PRESET_n,mstr_i,spiswai_i;
+	input [1:0]spi_mode_i;
+	input send_data_i;
+	input [11:0]BaudRateDivisor_i;
+
+	output reg receive_data_o,ss_o;
+	output tip_o;
+	
+	parameter mode_run=2'b00, mode_wait=2'b01, mode_stop=2'b10;
+
+	/*wire SCLK;
+	assign SCLK= (PCLK / BaudRateDivisor_i);*/
+	reg [15:0]count_s;
+	wire [15:0] target_s;
+	reg rcv_s;
+
+	assign target_s = BaudRateDivisor_i * 12'd8;
+	assign tip_o = (~(ss_o));
+	
+	//control the slave selec signal and receive indicator
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+		begin
+			count_s<=16'hFFFF;
+			ss_o<=1'b1;
+			rcv_s<=1'b0;
+		end
+
+		else if( (mstr_i) &&  ((spi_mode_i==mode_run) || (spi_mode_i==mode_wait)) && (!spiswai_i) )
+		begin
+			if(send_data_i == 1'b1)
+			begin
+				ss_o<=1'b0;
+				count_s<=16'h0000;
+			end
+
+			
+			else if(count_s < (target_s-1) )
+			begin	
+				count_s<=count_s+16'h1;
+				ss_o<=1'b0;
+			end
+			
+			else if(count_s == (target_s-1) )
+			begin
+				rcv_s <=1'b1;
+				//ss_o<=1'b1;
+				count_s <= 16'hFFFF;
+			end
+				
+
+			else
+			begin
+				ss_o<=1'b1;
+				rcv_s<=1'b0;
+				count_s<=16'hFFFF;
+			end
+		end	
+		
+		else
+		begin
+			count_s<=16'hFFFF;
+			ss_o<=1'b1;
+			rcv_s<=1'b0;
+		end
+	end
+	//generate the slave receive data signal
+	always@(posedge PCLK or negedge PRESET_n)
+	begin
+		if(!PRESET_n)
+			receive_data_o<=1'b0;
+		else
+			receive_data_o<=rcv_s;
+	end
+
+
+endmodule
+
+

@@ -1,0 +1,67 @@
+class apb_driver extends uvm_driver#(apb_trans);
+	`uvm_component_utils(apb_driver)
+
+	virtual apb_if.APB_DRV_MP apb_if;
+	apb_agt_config apb_cfg;
+	
+	function new(string name="apb_driver",uvm_component parent);
+		super.new(name,parent);
+	endfunction
+
+	function void build_phase(uvm_phase phase);
+		if(!uvm_config_db #(apb_agt_config)::get(this,"","apb_agt_config",apb_cfg))
+			`uvm_fatal(get_type_name(),"getting apb_cfg has failed!!");
+	endfunction
+
+	function void connect_phase(uvm_phase phase);
+		apb_if=apb_cfg.apb_if;
+	endfunction
+
+	task run_phase(uvm_phase phase);
+		reset_dut();
+		forever
+		begin
+			seq_item_port.get_next_item(req);
+			send_to_dut(req);
+			seq_item_port.item_done();
+		end
+	endtask
+
+	task reset_dut();
+		@(apb_if.apb_drv_cb)
+		apb_if.apb_drv_cb.PRESET_n<=1'b0;
+
+		repeat(3)
+		@(apb_if.apb_drv_cb)
+		apb_if.apb_drv_cb.PRESET_n<=1'b1;
+	endtask
+
+	task send_to_dut(apb_trans xtn);
+		@(apb_if.apb_drv_cb);
+		apb_if.apb_drv_cb.PRESET_n<=1'b1;
+		apb_if.apb_drv_cb.PADDR_i<=xtn.PADDR_i;
+		apb_if.apb_drv_cb.PWRITE_i<=xtn.PWRITE_i;
+		apb_if.apb_drv_cb.PSEL_i<=1'b1;
+		apb_if.apb_drv_cb.PENABLE_i<=1'b0;
+		
+		if(xtn.PWRITE_i==1'b1)
+		begin
+            		apb_if.apb_drv_cb.PWDATA_i<=xtn.PWDATA_i;
+        	end
+        
+        	@(apb_if.apb_drv_cb);
+            	apb_if.apb_drv_cb.PENABLE_i<=1'b1;
+            
+        	wait(apb_if.apb_drv_cb.PREADY_o) 
+        	if(xtn.PWRITE_i==1'b0)
+            		xtn.PRDATA_o=apb_if.apb_drv_cb.PRDATA_o;
+
+        	//`uvm_info(get_type_name(),xtn.sprint,UVM_LOW)
+
+        
+		@(apb_if.apb_drv_cb);
+
+        	apb_if.apb_drv_cb.PSEL_i<=1'b0;
+	        apb_if.apb_drv_cb.PENABLE_i<=1'b0;
+	endtask
+endclass
